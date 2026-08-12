@@ -58,6 +58,21 @@ function loadInitialAnalysis() {
 }
 
 const initialState = loadInitialAnalysis();
+
+function primaryTraceId(current: Analysis | null) {
+  if (!current) return "";
+  return (
+    [...current.traces].sort((left, right) => {
+      const score = (trace: TraceGroup) =>
+        Number(trace.hasError) * 10_000 +
+        trace.services.length * 1_000 +
+        trace.entries.length * 100 +
+        trace.durationMs;
+      return score(right) - score(left);
+    })[0]?.traceId ?? ""
+  );
+}
+
 const analysis = ref<Analysis | null>(initialState.analysis);
 const loading = ref(false);
 const error = ref(initialState.error);
@@ -66,7 +81,7 @@ const sourceOpen = ref(false);
 const query = ref("");
 const serviceFilter = ref("all");
 const levelFilter = ref<"all" | LogLevel>("all");
-const selectedTraceId = ref(initialState.analysis?.traces[0]?.traceId ?? "");
+const selectedTraceId = ref(primaryTraceId(initialState.analysis));
 const importInput = ref<HTMLInputElement | null>(null);
 let worker: Worker | null = null;
 
@@ -113,7 +128,7 @@ onMounted(() => {
     loading.value = false;
     if (event.data.ok) {
       analysis.value = event.data.analysis;
-      selectedTraceId.value = event.data.analysis.traces[0]?.traceId ?? "";
+      selectedTraceId.value = primaryTraceId(event.data.analysis);
       error.value = "";
       localStorage.setItem("traceframe-input", rawInput.value);
     } else {
@@ -209,6 +224,7 @@ function formatDuration(value: number) {
 
 <template>
   <div class="app-shell">
+    <a class="skip-link" href="#main">Skip to log investigation</a>
     <header class="topbar">
       <a class="brand" href="#main" aria-label="Traceframe home">
         <span class="brand-mark"><IconFlare :size="21" /></span>
